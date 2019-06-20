@@ -40,7 +40,7 @@ private class RsDeriveTraitReferenceImpl(
     element: RsMetaItem
 ) : RsReferenceBase<RsMetaItem>(element) {
 
-    override val RsMetaItem.referenceAnchor: PsiElement? get() = element.identifier
+    override val RsMetaItem.referenceAnchor: PsiElement? get() = element.compositeName
 
     fun resolveInner(): List<RsElement> {
         val traitName = element.name ?: return emptyList()

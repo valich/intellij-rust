@@ -23,7 +23,9 @@ import org.rust.stdext.chain
  * Checks for lifetime annotations which can be removed by relying on lifetime elision.
  * Corresponds to needless_lifetimes lint from Rust Clippy.
  */
-class RsNeedlessLifetimesInspection : RsLocalInspectionTool() {
+class RsNeedlessLifetimesInspection : RsLintInspection() {
+    override val lint: RsLint = RsLint.NeedlessLifetimes
+
     override fun buildVisitor(holder: ProblemsHolder, isOnTheFly: Boolean): RsVisitor = object : RsVisitor() {
         override fun visitFunction(fn: RsFunction) {
             if (couldUseElision(fn)) registerProblem(holder, fn)

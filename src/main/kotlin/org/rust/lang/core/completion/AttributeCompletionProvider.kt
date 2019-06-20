@@ -69,7 +69,7 @@ object AttributeCompletionProvider : CompletionProvider<CompletionParameters>() 
                                 context: ProcessingContext,
                                 result: CompletionResultSet) {
 
-        val elem = parameters.position.parent?.parent?.parent
+        val elem = parameters.position.parent?.parent?.parent?.parent
 
         val suggestions = attributes
             .filter { it.appliesTo.accepts(parameters.position) && elem.attrMetaItems.none { item -> item == it.name } }
@@ -82,7 +82,7 @@ object AttributeCompletionProvider : CompletionProvider<CompletionParameters>() 
         val innerAttrElem = psiElement<RsInnerAttr>()
         val metaItemElem = psiElement<RsMetaItem>()
             .and(PlatformPatterns.psiElement().withParent(outerAttrElem) or PlatformPatterns.psiElement().withParent(innerAttrElem))
-        return PlatformPatterns.psiElement().withParent(metaItemElem).withLanguage(RsLanguage)
+        return PlatformPatterns.psiElement().withSuperParent(2, metaItemElem).withLanguage(RsLanguage)
     }
 
     private fun createLookupElement(name: String): LookupElement =

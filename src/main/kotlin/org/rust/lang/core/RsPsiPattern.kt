@@ -42,10 +42,10 @@ object RsPsiPattern {
 
     val onMacro: PsiElementPattern.Capture<PsiElement> = onItem<RsMacro>()
 
-    val onTupleStruct: PsiElementPattern.Capture<PsiElement> = PlatformPatterns.psiElement()
-        .withSuperParent(3, PlatformPatterns.psiElement().withChild(psiElement<RsTupleFields>()))
+    val onTupleStruct: PsiElementPattern.Capture<PsiElement> = psiElement()
+        .withSuperParent(4, psiElement().withChild(psiElement<RsTupleFields>()))
 
-    val onCrate: PsiElementPattern.Capture<PsiElement> = PlatformPatterns.psiElement().withSuperParent<PsiFile>(3)
+    val onCrate: PsiElementPattern.Capture<PsiElement> = psiElement().withSuperParent<PsiFile>(4)
         .with("onCrateCondition") { e ->
             val file = e.containingFile.originalFile as RsFile
             file.isCrateRoot
@@ -67,7 +67,8 @@ object RsPsiPattern {
     val onDropFn: PsiElementPattern.Capture<PsiElement> get() {
         val dropTraitRef = psiElement<RsTraitRef>().withText("Drop")
         val implBlock = psiElement<RsImplItem>().withChild(dropTraitRef)
-        return psiElement().withSuperParent(5, implBlock)
+        val compositeName = psiElement().withParent(RsCompositeName::class.java)
+        return compositeName.withSuperParent(5, implBlock)
     }
 
     val onTestFn: PsiElementPattern.Capture<PsiElement> = onItem(psiElement<RsFunction>()
@@ -108,11 +109,13 @@ object RsPsiPattern {
     val error: PsiElementPattern.Capture<PsiErrorElement> = psiElement<PsiErrorElement>()
 
     private inline fun <reified I : RsDocAndAttributeOwner> onItem(): PsiElementPattern.Capture<PsiElement> {
-        return psiElement().withSuperParent<I>(3)
+        val compositeName = psiElement().withParent(RsCompositeName::class.java)
+        return compositeName.withSuperParent<I>(3)
     }
 
     private fun onItem(pattern: ElementPattern<out RsDocAndAttributeOwner>): PsiElementPattern.Capture<PsiElement> {
-        return psiElement().withSuperParent(3, pattern)
+        val compositeName = psiElement().withParent(RsCompositeName::class.java)
+        return compositeName.withSuperParent(3, pattern)
     }
 
     private class OnStatementBeginning(vararg startWords: String) : PatternCondition<PsiElement>("on statement beginning") {

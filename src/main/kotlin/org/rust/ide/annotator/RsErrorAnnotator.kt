@@ -425,7 +425,7 @@ class RsErrorAnnotator : RsAnnotatorBase(), HighlightRangeExtension {
 
     private fun checkImplBothCopyAndDrop(holder: AnnotationHolder, attr: RsAttr) {
         if (attr.metaItem.name != "derive") return
-        val deriveCopy = attr.metaItem.metaItemArgs?.metaItemList?.find { it?.identifier?.text == "Copy" } ?: return
+        val deriveCopy = attr.metaItem.metaItemArgs?.metaItemList?.find { it?.name == "Copy" } ?: return
         val selfType = (attr.parent as? RsStructOrEnumItemElement)?.declaredType ?: return
         checkImplBothCopyAndDrop(holder, selfType, deriveCopy, attr.knownItems.Copy ?: return)
     }
@@ -543,7 +543,7 @@ class RsErrorAnnotator : RsAnnotatorBase(), HighlightRangeExtension {
                 }
             }
             else ->
-                RsDiagnostic.InvalidStartAttrError.InvalidOwner(attr.metaItem.identifier ?: attr.metaItem)
+                RsDiagnostic.InvalidStartAttrError.InvalidOwner(attr.metaItem.compositeName ?: attr.metaItem)
                     .addToHolder(holder)
         }
     }
@@ -572,7 +572,7 @@ class RsErrorAnnotator : RsAnnotatorBase(), HighlightRangeExtension {
             } ?: return
 
             if (parent !is RsFunction && parent !is RsLambdaExpr) {
-                RsDiagnostic.IncorrectlyPlacedInlineAttr(metaItem.identifier ?: metaItem, attr)
+                RsDiagnostic.IncorrectlyPlacedInlineAttr(metaItem.compositeName ?: metaItem, attr)
                     .addToHolder(holder)
             }
         }

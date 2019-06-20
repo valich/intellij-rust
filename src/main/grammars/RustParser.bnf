@@ -130,7 +130,7 @@ OuterAttr ::= '#'     '[' AttrUpper {
 private AttrUpper ::= MetaItemWithoutTT ']' |  MetaItemWithTT ']'
 private OuterAttr_first ::= '#'
 
-fake MetaItem ::= identifier [ '=' LitExpr | MetaItemArgs ] | CompactTT {
+fake MetaItem ::= CompositeName [ '=' LitExpr | MetaItemArgs ] | CompactTT {
   implements = [ "org.rust.lang.core.psi.ext.RsWeakReferenceElement"
                  "com.intellij.psi.ContributedReferenceHost" ]
   mixin = "org.rust.lang.core.psi.ext.RsMetaItemImplMixin"
@@ -140,14 +140,14 @@ fake MetaItem ::= identifier [ '=' LitExpr | MetaItemArgs ] | CompactTT {
 
 // #[test]
 //   ~~~~
+// #[some::path]
+//   ~~~~~~~~~~
 // #[derive(Debug)]
 //   ~~~~~~~~~~~~~
 // #![crate_type = "lib"]
 //    ~~~~~~~~~~~~~~~~~~
-MetaItemWithoutTT ::= identifier [ '=' LitExpr | MetaItemArgs ] { elementType = MetaItem }
+MetaItemWithoutTT ::= CompositeName [ '=' LitExpr | MetaItemArgs ] { elementType = MetaItem }
 
-// #[some::path]
-//   ~~~~~~~~~~
 // #[assert_instr(add_a.b)]
 //                ~~~~~~~
 // #[attr(value = C)]
@@ -162,6 +162,11 @@ MetaItemArgs ::= '(' ( [ <<comma_separated_list (LitExpr | MetaItemWithoutTT )>>
   elementTypeFactory = "org.rust.lang.core.stubs.StubImplementationsKt.factory"
 }
 
+CompositeName ::= identifier ( '::' identifier )* {
+  extends = "org.rust.lang.core.psi.ext.RsStubbedElementImpl<?>"
+  stubClass = "org.rust.lang.core.stubs.RsPlaceholderStub"
+  elementTypeFactory = "org.rust.lang.core.stubs.StubImplementationsKt.factory"
+}
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // Paths
@@ -213,7 +218,6 @@ AssocTypeBinding ::= identifier '=' TypeReference {
   stubClass = "org.rust.lang.core.stubs.RsAssocTypeBindingStub"
   elementTypeFactory = "org.rust.lang.core.stubs.StubImplementationsKt.factory"
 }
-
 
 // Paths for expressions:
 //     a::b::<T,U>::c

@@ -558,7 +558,7 @@ sealed class RsDiagnostic(
 
     class ReprForEmptyEnumError(
         val attr: RsAttr,
-        element: PsiElement = attr.metaItem.identifier ?: attr.metaItem
+        element: PsiElement = attr.metaItem.compositeName ?: attr.metaItem
     ) : RsDiagnostic(element) {
         override fun prepare() = PreparedAnnotation(
             ERROR,
