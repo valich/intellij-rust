@@ -7,7 +7,9 @@ package org.rust.ide.annotator
 
 import com.intellij.codeInsight.daemon.impl.SeveritiesProvider
 import com.intellij.lang.annotation.HighlightSeverity
+import com.intellij.openapi.extensions.Extensions
 import com.intellij.testFramework.PlatformTestUtil
+import com.intellij.testFramework.fixtures.CodeInsightTestFixture.*
 import com.intellij.testFramework.fixtures.impl.CodeInsightTestFixtureImpl
 import org.intellij.lang.annotations.Language
 import org.rust.RsTestBase
@@ -201,11 +203,21 @@ abstract class RsAnnotationTestBase : RsTestBase() {
         }
     }
 
+    override fun configureByText(text: String) {
+        super.configureByText(text.replaceHighlightingComments())
+    }
+
     private fun configureByFileTree(text: String, stubOnly: Boolean) {
-        val testProject = configureByFileTree(text)
+        val testProject = configureByFileTree(text.replaceHighlightingComments())
         if (stubOnly) {
             (myFixture as CodeInsightTestFixtureImpl)
                 .setVirtualFileFilter { !it.path.endsWith(testProject.fileWithCaret) }
+        }
+    }
+
+    private fun String.replaceHighlightingComments(): String {
+        return replace(HIGHLIGHTING_TAG_RE) {
+            if (it.groups[3] == null) "<${it.groupValues[1]}>" else "</${it.groupValues[1]}>"
         }
     }
 
@@ -229,6 +241,11 @@ abstract class RsAnnotationTestBase : RsTestBase() {
 
     protected fun registerSeverities(severities: List<HighlightSeverity>) {
         val testSeverityProvider = RsTestSeverityProvider(severities)
-        PlatformTestUtil.registerExtension(SeveritiesProvider.EP_NAME, testSeverityProvider, testRootDisposable)
+        SeveritiesProvider.EP_NAME.getPoint(null).registerExtension(testSeverityProvider, testRootDisposable)
+    }
+
+    companion object {
+        private val HIGHLIGHTING_TAG_RE =
+            """/\*(($ERROR_MARKER|$WARNING_MARKER|$WEAK_WARNING_MARKER|$INFO_MARKER).*?)(\*)?\*/""".toRegex()
     }
 }
