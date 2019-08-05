@@ -98,7 +98,8 @@ fun <T: RsElement> instantiatePathGenerics(
     lookup: ImplLookup
 ): BoundElement<T> {
     val (element, subst) = resolved.downcast<RsGenericDeclaration>() ?: return resolved
-    val typeArguments: List<Ty>? = run {
+
+    val typeArguments = run {
         val inAngles = path.typeArgumentList
         val fnSugar = path.valueParameterList
         when {
@@ -109,7 +110,6 @@ fun <T: RsElement> instantiatePathGenerics(
             else -> null
         }
     }
-    val regionArguments: List<Region>? = path.typeArgumentList?.lifetimeList?.map { it.resolve() }
     val outputArg = path.retType?.typeReference?.type
 
     val assocTypes = run {
@@ -153,7 +153,9 @@ fun <T: RsElement> instantiatePathGenerics(
         }
         paramTy to value
     }
+
     val regionParameters = element.lifetimeParameters.map { ReEarlyBound(it) }
+    val regionArguments = path.typeArgumentList?.lifetimeList?.map { it.resolve() }
     val regionSubst = regionParameters.zip(regionArguments ?: regionParameters).toMap()
     val newSubst = Substitution(typeSubst, regionSubst)
     return BoundElement(resolved.element, subst + newSubst, assocTypes)
