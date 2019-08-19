@@ -425,7 +425,7 @@ private fun generateTypeReferenceDocumentation(element: RsTypeReference, buffer:
             typeElement.typeReference.generateDocumentation(buffer)
             if (!typeElement.isSlice) {
                 buffer += "; "
-                buffer.append(typeElement.arraySize ?: "<unknown>")
+                buffer.append(typeElement.expr?.text ?: "<unknown>")
             }
             buffer += "]"
         }

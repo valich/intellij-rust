@@ -110,6 +110,6 @@ class BooleanExprSimplifier(val project: Project) {
         private fun canBeEvaluated(expr: RsExpr): Boolean = eval(expr) != null
 
         private fun eval(expr: RsExpr): Boolean? =
-            (RsConstExprEvaluator.evaluate(expr, TyBool, null) as? ExprValue.Bool)?.value
+            (RsConstExprEvaluator.evaluate(expr, TyBool, pathExprResolver = null) as? ExprValue.Bool)?.value
     }
 }

@@ -9,6 +9,8 @@ import org.rust.lang.core.psi.*
 import org.rust.lang.core.psi.ext.*
 import org.rust.lang.core.resolve.ref.advancedDeepResolve
 import org.rust.lang.core.types.Substitution
+import org.rust.lang.core.types.consts.CtUnknown
+import org.rust.lang.core.types.consts.CtValue
 import org.rust.lang.core.types.regions.ReEarlyBound
 import org.rust.lang.core.types.regions.ReStatic
 import org.rust.lang.core.types.regions.ReUnknown
@@ -75,7 +77,9 @@ fun inferTypeReferenceType(ref: RsTypeReference, defaultTraitObjectRegion: Regio
             if (type.isSlice) {
                 TySlice(componentType)
             } else {
-                TyArray(componentType, type.arraySize)
+                val size = type.getArraySize()
+                val const = if (size != null) CtValue(size) else CtUnknown
+                TyArray(componentType, const)
             }
         }
 

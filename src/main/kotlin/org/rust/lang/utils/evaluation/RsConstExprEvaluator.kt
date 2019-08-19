@@ -7,6 +7,9 @@ package org.rust.lang.utils.evaluation
 
 import org.rust.lang.core.psi.*
 import org.rust.lang.core.psi.ext.*
+import org.rust.lang.core.types.Substitution
+import org.rust.lang.core.types.consts.CtValue
+import org.rust.lang.core.types.emptySubstitution
 import org.rust.lang.core.types.ty.*
 import org.rust.lang.core.types.type
 
@@ -19,25 +22,27 @@ object RsConstExprEvaluator {
     fun evaluate(
         expr: RsExpr,
         expectedTy: Ty = expr.type,
+        subst: Substitution = emptySubstitution,
         pathExprResolver: ((RsPathExpr) -> RsElement?)? = defaultExprPathResolver
     ): ExprValue? {
         val evaluation = when (expectedTy) {
-            is TyInteger -> IntegerExprEvaluation(expectedTy, pathExprResolver)
-            is TyBool -> BoolExprEvaluation(pathExprResolver)
-            is TyFloat -> FloatExprEvaluation(expectedTy, pathExprResolver)
-            is TyChar -> CharExprEvaluation(pathExprResolver)
+            is TyInteger -> IntegerExprEvaluation(expectedTy, subst, pathExprResolver)
+            is TyBool -> BoolExprEvaluation(subst, pathExprResolver)
+            is TyFloat -> FloatExprEvaluation(expectedTy, subst, pathExprResolver)
+            is TyChar -> CharExprEvaluation(subst, pathExprResolver)
             // TODO: type should be "wider"
-            STR_REF_TYPE -> StrExprEvaluation(pathExprResolver)
+            STR_REF_TYPE -> StrExprEvaluation(subst, pathExprResolver)
             else -> null
         }
         return evaluation?.evaluate(expr)
     }
 }
 
-private open class ExprEvaluation<T: Ty, V>(
+private open class ExprEvaluation<T : Ty, V>(
     protected val expectedTy: T,
     private val pathExprResolver: ((RsPathExpr) -> RsElement?)?,
     private val evalLitExpr: RsLitExpr.() -> V?,
+    private val subst: Substitution,
     private val exprValueCtr: (V) -> ExprValue
 ) {
 
@@ -54,11 +59,26 @@ private open class ExprEvaluation<T: Ty, V>(
             is RsLitExpr -> expr.evalLitExpr()
             is RsParenExpr -> evaluate(expr.expr, depth + 1)
             is RsPathExpr -> {
-                val const = pathExprResolver?.invoke(expr) as? RsConstant ?: return null
-                if (!const.isConst) return null
-                val path = (const.typeReference?.typeElement as? RsBaseType)?.path ?: return null
+                val element = pathExprResolver?.invoke(expr)
+
+                val typeReference = when (element) {
+                    is RsConstant -> element.typeReference?.takeIf { element.isConst }
+                    is RsConstParameter -> element.typeReference
+                    else -> null
+                }
+
+                val path = (typeReference?.typeElement as? RsBaseType)?.path ?: return null
                 if (TyPrimitive.fromPath(path) != expectedTy) return null
-                evaluate(const.expr, depth + 1)
+
+                when (element) {
+                    is RsConstant -> evaluate(element.expr, depth + 1)
+                    is RsConstParameter -> {
+                        val const = subst[element] as? CtValue
+                        @Suppress("UNCHECKED_CAST")
+                        const?.expr as? V
+                    }
+                    else -> null
+                }
             }
             else -> null
         }
@@ -71,8 +91,9 @@ private open class ExprEvaluation<T: Ty, V>(
 
 private class IntegerExprEvaluation(
     expectedTy: TyInteger,
+    subst: Substitution,
     pathExprResolver: ((RsPathExpr) -> RsElement?)?
-) : ExprEvaluation<TyInteger, Long>(expectedTy, pathExprResolver, RsLitExpr::integerValue, ExprValue::Integer) {
+) : ExprEvaluation<TyInteger, Long>(expectedTy, pathExprResolver, RsLitExpr::integerValue, subst, ExprValue::Integer) {
 
     override fun evaluateInner(expr: RsExpr?, depth: Int): Long? {
         return when (expr) {
@@ -133,8 +154,9 @@ private class IntegerExprEvaluation(
 }
 
 private class BoolExprEvaluation(
+    subst: Substitution,
     pathExprResolver: ((RsPathExpr) -> RsElement?)?
-) : ExprEvaluation<TyBool, Boolean>(TyBool, pathExprResolver, RsLitExpr::booleanValue, ExprValue::Bool) {
+) : ExprEvaluation<TyBool, Boolean>(TyBool, pathExprResolver, RsLitExpr::booleanValue, subst, ExprValue::Bool) {
 
     override fun evaluateInner(expr: RsExpr?, depth: Int): Boolean? {
         return when (expr) {
@@ -169,13 +191,16 @@ private class BoolExprEvaluation(
 
 private class FloatExprEvaluation(
     expectedTy: TyFloat,
+    subst: Substitution,
     pathExprResolver: ((RsPathExpr) -> RsElement?)?
-) : ExprEvaluation<TyFloat, Double>(expectedTy, pathExprResolver, RsLitExpr::floatValue, ExprValue::Float)
+) : ExprEvaluation<TyFloat, Double>(expectedTy, pathExprResolver, RsLitExpr::floatValue, subst, ExprValue::Float)
 
 private class CharExprEvaluation(
+    subst: Substitution,
     pathExprResolver: ((RsPathExpr) -> RsElement?)?
-) : ExprEvaluation<TyChar, String>(TyChar, pathExprResolver, RsLitExpr::charValue, ExprValue::Char)
+) : ExprEvaluation<TyChar, String>(TyChar, pathExprResolver, RsLitExpr::charValue, subst, ExprValue::Char)
 
 private class StrExprEvaluation(
+    subst: Substitution,
     pathExprResolver: ((RsPathExpr) -> RsElement?)?
-) : ExprEvaluation<TyReference, String>(STR_REF_TYPE, pathExprResolver, RsLitExpr::stringValue, ExprValue::Str)
+) : ExprEvaluation<TyReference, String>(STR_REF_TYPE, pathExprResolver, RsLitExpr::stringValue, subst, ExprValue::Str)

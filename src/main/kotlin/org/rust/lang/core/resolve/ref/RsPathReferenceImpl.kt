@@ -12,14 +12,17 @@ import org.rust.lang.core.psi.ext.*
 import org.rust.lang.core.resolve.*
 import org.rust.lang.core.types.BoundElement
 import org.rust.lang.core.types.Substitution
+import org.rust.lang.core.types.consts.CtConstParameter
+import org.rust.lang.core.types.consts.CtUnknown
+import org.rust.lang.core.types.consts.CtValue
 import org.rust.lang.core.types.infer.foldTyInferWith
 import org.rust.lang.core.types.infer.resolve
 import org.rust.lang.core.types.infer.substitute
 import org.rust.lang.core.types.inference
 import org.rust.lang.core.types.regions.ReEarlyBound
-import org.rust.lang.core.types.regions.Region
 import org.rust.lang.core.types.ty.*
 import org.rust.lang.core.types.type
+import org.rust.lang.utils.evaluation.RsConstExprEvaluator
 import org.rust.stdext.buildMap
 import org.rust.stdext.intersects
 
@@ -92,7 +95,7 @@ fun resolvePath(path: RsPath, lookup: ImplLookup = ImplLookup.relativeTo(path)):
     }
 }
 
-fun <T: RsElement> instantiatePathGenerics(
+fun <T : RsElement> instantiatePathGenerics(
     path: RsPath,
     resolved: BoundElement<T>,
     lookup: ImplLookup
@@ -157,7 +160,16 @@ fun <T: RsElement> instantiatePathGenerics(
     val regionParameters = element.lifetimeParameters.map { ReEarlyBound(it) }
     val regionArguments = path.typeArgumentList?.lifetimeList?.map { it.resolve() }
     val regionSubst = regionParameters.zip(regionArguments ?: regionParameters).toMap()
-    val newSubst = Substitution(typeSubst, regionSubst)
+
+    val constParameters = element.constParameters.map { CtConstParameter(it) }
+    val constArguments = path.typeArgumentList?.exprList?.withIndex()?.map { (i, expr) ->
+        val expectedTy = constParameters.getOrNull(i)?.parameter?.typeReference?.type ?: TyUnknown
+        val value = RsConstExprEvaluator.evaluate(expr, expectedTy) ?: return@map CtUnknown
+        CtValue(value)
+    }
+    val constSubst = constParameters.zip(constArguments ?: constParameters).toMap()
+
+    val newSubst = Substitution(typeSubst, regionSubst, constSubst)
     return BoundElement(resolved.element, subst + newSubst, assocTypes)
 }
 

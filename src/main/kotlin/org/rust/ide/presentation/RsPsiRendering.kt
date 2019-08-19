@@ -101,7 +101,7 @@ private fun StringBuilder.appendTypeReference(ref: RsTypeReference, subst: Subst
             appendTypeReference(type.typeReference, subst)
             if (!type.isSlice) {
                 append("; ")
-                append(type.arraySize) // may trigger resolve
+                append(type.expr?.text ?: "<unknown>") // may trigger resolve
             }
             append("]")
         }
@@ -142,26 +142,36 @@ private fun StringBuilder.appendPath(path: RsPath, subst: Substitution) {
     val fnSugar = path.valueParameterList // &dyn FnOnce(...) -> i32
     if (inAngles != null) {
         append("<")
-        val lifetimeList = inAngles.lifetimeList
-        val typeReferenceList = inAngles.typeReferenceList
-        val assocTypeBindingList = inAngles.assocTypeBindingList
-        if (lifetimeList.isNotEmpty()) {
-            lifetimeList.joinToWithBuffer(this, ", ") { it.append(referenceName) }
-            if (typeReferenceList.isNotEmpty() || assocTypeBindingList.isNotEmpty()) {
+
+        val lifetimeArguments = inAngles.lifetimeList
+        val typeArguments = inAngles.typeReferenceList
+        val constArguments = inAngles.exprList
+        val assocTypeBindings = inAngles.assocTypeBindingList
+
+        if (lifetimeArguments.isNotEmpty()) {
+            lifetimeArguments.joinToWithBuffer(this, ", ") { it.append(referenceName) }
+            if (typeArguments.isNotEmpty() || constArguments.isNotEmpty() || assocTypeBindings.isNotEmpty()) {
                 append(", ")
             }
         }
-        if (typeReferenceList.isNotEmpty()) {
-            typeReferenceList.joinToWithBuffer(this, ", ") { it.appendTypeReference(this, subst) }
-            if (assocTypeBindingList.isNotEmpty()) {
+        if (typeArguments.isNotEmpty()) {
+            typeArguments.joinToWithBuffer(this, ", ") { it.appendTypeReference(this, subst) }
+            if (constArguments.isNotEmpty() || assocTypeBindings.isNotEmpty()) {
                 append(", ")
             }
         }
-        assocTypeBindingList.joinToWithBuffer(this, ", ") { sb ->
+        if (constArguments.isNotEmpty()) {
+            constArguments.joinToWithBuffer(this, ", ") { it.append(text) } // TODO
+            if (assocTypeBindings.isNotEmpty()) {
+                append(", ")
+            }
+        }
+        assocTypeBindings.joinToWithBuffer(this, ", ") { sb ->
             sb.append(referenceName)
             sb.append("=")
             typeReference?.let { sb.appendTypeReference(it, subst) }
         }
+
         append(">")
     } else if (fnSugar != null) {
         appendValueParameterListTypes(fnSugar.valueParameterList, subst)

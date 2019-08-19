@@ -7,6 +7,9 @@ package org.rust.lang.core.types.infer
 
 import com.intellij.util.BitUtil
 import org.rust.lang.core.types.*
+import org.rust.lang.core.types.consts.Const
+import org.rust.lang.core.types.consts.CtConstParameter
+import org.rust.lang.core.types.infer.HasTypeFlagVisitor.Companion.HAS_CT_PARAMETER_VISITOR
 import org.rust.lang.core.types.infer.HasTypeFlagVisitor.Companion.HAS_RE_EARLY_BOUND_VISITOR
 import org.rust.lang.core.types.infer.HasTypeFlagVisitor.Companion.HAS_TY_INFER_VISITOR
 import org.rust.lang.core.types.infer.HasTypeFlagVisitor.Companion.HAS_TY_PROJECTION_VISITOR
@@ -18,11 +21,13 @@ import org.rust.lang.core.types.ty.*
 interface TypeFolder {
     fun foldTy(ty: Ty): Ty = ty
     fun foldRegion(region: Region): Region = region
+    fun foldConst(const: Const): Const = const
 }
 
 interface TypeVisitor {
     fun visitTy(ty: Ty): Boolean = false
     fun visitRegion(region: Region): Boolean = false
+    fun visitConst(const: Const): Boolean = false
 }
 
 /**
@@ -87,6 +92,13 @@ fun <T> TypeFoldable<T>.foldTyTypeParameterWith(folder: (TyTypeParameter) -> Ty)
             ty.hasTyTypeParameters -> ty.superFoldWith(this)
             else -> ty
         }
+    })
+
+/** Deeply replace any [CtConstParameter] with the function [folder] */
+fun <T> TypeFoldable<T>.foldConstParameterWith(folder: (CtConstParameter) -> Const): T =
+    foldWith(object : TypeFolder {
+        override fun foldTy(ty: Ty): Ty = if (ty.hasCtConstParameters) ty.superFoldWith(this) else ty
+        override fun foldConst(const: Const): Const = if (const is CtConstParameter) folder(const) else const
     })
 
 /** Deeply replace any [TyProjection] with the function [folder] */
@@ -157,12 +169,14 @@ fun <T> TypeFoldable<T>.visitInferTys(visitor: (TyInfer) -> Boolean): Boolean {
 private data class HasTypeFlagVisitor(val flag: TypeFlags) : TypeVisitor {
     override fun visitTy(ty: Ty): Boolean = BitUtil.isSet(ty.flags, flag)
     override fun visitRegion(region: Region): Boolean = BitUtil.isSet(region.flags, flag)
+    override fun visitConst(const: Const): Boolean = BitUtil.isSet(const.flags, flag)
 
     companion object {
         val HAS_TY_INFER_VISITOR = HasTypeFlagVisitor(HAS_TY_INFER_MASK)
         val HAS_TY_TYPE_PARAMETER_VISITOR = HasTypeFlagVisitor(HAS_TY_TYPE_PARAMETER_MASK)
         val HAS_TY_PROJECTION_VISITOR = HasTypeFlagVisitor(HAS_TY_PROJECTION_MASK)
         val HAS_RE_EARLY_BOUND_VISITOR = HasTypeFlagVisitor(HAS_RE_EARLY_BOUND_MASK)
+        val HAS_CT_PARAMETER_VISITOR = HasTypeFlagVisitor(HAS_CT_PARAMETER_MASK)
     }
 }
 
@@ -178,5 +192,8 @@ val TypeFoldable<*>.hasTyProjection
 val TypeFoldable<*>.hasReEarlyBounds
     get(): Boolean = visitWith(HAS_RE_EARLY_BOUND_VISITOR)
 
+val TypeFoldable<*>.hasCtConstParameters
+    get(): Boolean = visitWith(HAS_CT_PARAMETER_VISITOR)
+
 val TypeFoldable<*>.needToSubstitute
-    get(): Boolean = hasTyTypeParameters || hasReEarlyBounds
+    get(): Boolean = hasTyTypeParameters || hasReEarlyBounds || hasCtConstParameters
