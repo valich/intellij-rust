@@ -20,7 +20,9 @@ class RsExternCrateReferenceImpl(
     override val RsExternCrateItem.referenceAnchor: PsiElement get() = referenceNameElement
 
     override fun resolveInner(): List<RsElement> =
-        collectResolveVariants(element.referenceName) { processExternCrateResolveVariants(element, false, it) }
+        collectResolveVariants(element.referenceName) {
+            processExternCrateResolveVariants(element, withSelf = true, processor = it)
+        }
 
     override fun isReferenceTo(element: PsiElement): Boolean =
         element is RsFile && super.isReferenceTo(element)

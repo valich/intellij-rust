@@ -121,6 +121,7 @@ abstract class RsTestBase : LightPlatformCodeInsightFixtureTestCase(), RsTestCas
             }
             // These functions exist to simplify stacktrace analyzing
             runTestEdition2015()
+            saveAllDocuments() // Fixes VFS conflicts
             runTestEdition2018()
         } else {
             super.runTest()

@@ -148,7 +148,7 @@ data class AssocItemScopeEntry(
     override val source: TraitImplSource
 ) : AssocItemScopeEntryBase<RsAbstractable>
 
-private class LazyScopeEntry(
+private open class LazyScopeEntry(
     override val name: String,
     thunk: Lazy<RsElement?>
 ) : ScopeEntry {
@@ -157,12 +157,18 @@ private class LazyScopeEntry(
     override fun toString(): String = "LazyScopeEntry($name, $element)"
 }
 
+private class ExterCrateScopeEntry(name: String, thunk: Lazy<RsElement?>) : LazyScopeEntry(name, thunk)
+
+val ScopeEntry.isExterCrateEntry: Boolean get() = this is ExterCrateScopeEntry
 
 operator fun RsResolveProcessor.invoke(name: String, e: RsElement): Boolean =
     this(SimpleScopeEntry(name, e))
 
 fun RsResolveProcessor.lazy(name: String, e: () -> RsElement?): Boolean =
     this(LazyScopeEntry(name, lazy(LazyThreadSafetyMode.PUBLICATION, e)))
+
+fun RsResolveProcessor.lazyExternCrate(name: String, e: () -> RsElement?): Boolean =
+    this(ExterCrateScopeEntry(name, lazy(LazyThreadSafetyMode.PUBLICATION, e)))
 
 operator fun RsResolveProcessor.invoke(e: RsNamedElement): Boolean {
     val name = e.name ?: return false
@@ -193,7 +199,7 @@ fun processAllWithSubst(
     return false
 }
 
-fun filterCompletionVariantsByVisibility(processor: RsResolveProcessor, mod: RsMod): RsResolveProcessor {
+fun filterCompletionVariantsByVisibility(mod: RsMod, processor: RsResolveProcessor): RsResolveProcessor {
     return fun(it: ScopeEntry): Boolean {
         val element = it.element
         if (element is RsVisible && !element.isVisibleFrom(mod)) return false
