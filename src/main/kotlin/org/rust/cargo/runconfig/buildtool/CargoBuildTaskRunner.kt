@@ -8,6 +8,7 @@ package org.rust.cargo.runconfig.buildtool
 import com.intellij.execution.ExecutorRegistry
 import com.intellij.execution.RunManager
 import com.intellij.execution.executors.DefaultRunExecutor
+import com.intellij.execution.impl.RunManagerImpl
 import com.intellij.execution.runners.ExecutionEnvironment
 import com.intellij.execution.runners.ProgramRunner
 import com.intellij.openapi.diagnostic.Logger
@@ -20,6 +21,8 @@ import org.rust.cargo.project.settings.rustSettings
 import org.rust.cargo.runconfig.CargoCommandRunner
 import org.rust.cargo.runconfig.buildProject
 import org.rust.cargo.runconfig.buildtool.CargoBuildManager.CANCELED_BUILD_RESULT
+import org.rust.cargo.runconfig.buildtool.CargoBuildManager.createBuildEnvironment
+import org.rust.cargo.runconfig.buildtool.CargoBuildManager.getBuildConfiguration
 import org.rust.cargo.runconfig.buildtool.CargoBuildManager.isBuildToolWindowEnabled
 import org.rust.cargo.runconfig.command.CargoCommandConfiguration
 import org.rust.cargo.runconfig.createCargoCommandRunConfiguration
@@ -75,10 +78,19 @@ class CargoBuildTaskRunner : ProjectTaskRunner() {
         if (task !is ModuleBuildTask) return listOf(task)
 
         val project = task.module.project
+        val runManager = RunManager.getInstance(project) as? RunManagerImpl ?: return emptyList()
+
+        val selectedConfiguration = runManager.selectedConfiguration?.configuration as? CargoCommandConfiguration
+        if (selectedConfiguration != null) {
+            val buildConfiguration = getBuildConfiguration(selectedConfiguration) ?: return emptyList()
+            val environment = createBuildEnvironment(buildConfiguration) ?: return emptyList()
+            val buildableElement = CargoBuildConfiguration(buildConfiguration, environment)
+            return listOf(ProjectModelBuildTaskImpl(buildableElement, false))
+        }
+
         val cargoProjects = project.cargoProjects.allProjects
         if (cargoProjects.isEmpty()) return emptyList()
 
-        val runManager = RunManager.getInstance(project)
         val executor = ExecutorRegistry.getInstance().getExecutorById(DefaultRunExecutor.EXECUTOR_ID)
         val runner = ProgramRunner.findRunnerById(CargoCommandRunner.RUNNER_ID) ?: return emptyList()
 
