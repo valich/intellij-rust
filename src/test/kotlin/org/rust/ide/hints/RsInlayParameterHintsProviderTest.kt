@@ -118,6 +118,16 @@ class RsInlayParameterHintsProviderTest : RsPlainInlayHintsProviderTestBase() {
         }
     """, enabledHints = RsPlainParameterHint.PARAMETER_HINT)
 
+    fun `test fn arg with mut ident`() = checkByText("""
+        fn foo(mut arg: u32) {}
+        fn main() { foo(/*hint text="arg:"*/0); }
+    """, enabledHints = RsPlainParameterHint.PARAMETER_HINT)
+
+    fun `test fn arg with mut array`() = checkByText("""
+        fn foo([mut x, y]: [i32; 2]) {}
+        fn main() { foo(/*hint text="[x, y]:"*/0); }
+    """, enabledHints = RsPlainParameterHint.PARAMETER_HINT)
+
     fun `test don't touch ast`() {
         fileTreeFromText("""
         //- main.rs
