@@ -22,6 +22,7 @@ import org.rust.lang.core.parser.RustParserDefinition.Companion.OUTER_BLOCK_DOC_
 import org.rust.lang.core.parser.RustParserDefinition.Companion.OUTER_EOL_DOC_COMMENT
 import org.rust.lang.core.psi.*
 import org.rust.lang.core.psi.RsElementTypes.*
+import org.rust.stdext.buildMap
 import org.rust.stdext.makeBitMask
 import org.rust.stdext.removeLast
 
@@ -36,6 +37,11 @@ object RustParserUtil : GeneratedParserUtilBase() {
         NO_TYPES
     }
     enum class BinaryMode { ON, OFF }
+    enum class MacroCallParsingMode(val semicolon: Boolean, val pin: Boolean, val forbidExprSpecialMacros: Boolean) {
+        MC_ITEM(true, true, false),
+        MC_BLOCK(true, false, true),
+        MC_EXPR(false, true, false)
+    }
 
     private val FLAGS: Key<Int> = Key("RustParserUtil.FLAGS")
     private var PsiBuilder.flags: Int
@@ -267,6 +273,84 @@ object RustParserUtil : GeneratedParserUtilBase() {
         val result = traitTypeUpperP.parse(b, level + 1)
         exit_section_(b, baseOrTrait, TRAIT_TYPE, result)
         return result
+    }
+
+    private val SPECIAL_MACRO_PARSERS: Map<String, (PsiBuilder, Int) -> Boolean> = buildMap {
+        fun put(parser: (PsiBuilder, Int) -> Boolean, vararg keys: String): Unit =
+            keys.forEach { put(it, parser) }
+
+        put(RustParser::ExprMacroArgument, "try", "await", "dbg")
+        put(RustParser::FormatMacroArgument, "format", "format_args", "write", "writeln", "print", "println",
+            "eprint", "eprintln", "panic", "unimplemented", "unreachable")
+        put(RustParser::AssertMacroArgument, "assert", "debug_assert", "assert_eq", "assert_ne", "debug_assert_eq",
+            "debug_assert_ne")
+        put(RustParser::VecMacroArgument, "vec")
+        put(RustParser::LogMacroArgument, "trace", "log", "warn", "debug", "error", "info")
+        put(RustParser::IncludeMacroArgument, "include", "include_str", "include_bytes")
+        put(RustParser::ConcatMacroArgument, "concat")
+    }
+
+    // We parse some macros (like `println`) as a specific syntax constructions. This
+    // is a list of such specific macros that should be always parsed as `MacroExpr`.
+    // E.g. `println!();` should be parsed as `ExprStmt(MacroExpr(MacroCall(...)))`, but
+    // any other `foo!();` as a simple `MacroCall(...)`
+    private val SPECIAL_EXPR_MACROS = setOf(
+        "try", "await", "dbg", "format", "format_args", "write", "writeln", "print", "println", "eprint",
+        "eprintln", "panic", "unimplemented", "unreachable", "assert", "debug_assert", "assert_eq", "assert_ne",
+        "debug_assert_eq", "debug_assert_ne", "trace", "log", "warn", "debug", "error", "info", "include_str",
+        "include_bytes", "concat")
+
+    @JvmStatic
+    fun parseMacroCall(b: PsiBuilder, level: Int, mode: MacroCallParsingMode): Boolean {
+        if (!RustParser.AttrsAndVis(b, level + 1)) return false
+
+        val macroName = lookupSimpleMacroName(b)
+        if (mode.forbidExprSpecialMacros && macroName in SPECIAL_EXPR_MACROS) return false
+
+        if (!RustParser.PathWithoutTypes(b, level + 1) || !consumeToken(b, EXCL)) {
+            return false
+        }
+
+        // foo! bar {}
+        //      ^ this ident
+        val hasIdent = consumeTokenFast(b, IDENTIFIER)
+
+        val braceKind = b.tokenType?.let { MacroBraces.fromToken(it) }
+
+        if(macroName != null && !hasIdent && braceKind != null) { // try special macro
+            val specialParser = SPECIAL_MACRO_PARSERS[macroName]
+            if (specialParser != null && specialParser(b, level + 1)) {
+                if (braceKind.needsSemicolon && mode.semicolon && !consumeToken(b, SEMICOLON)) {
+                    b.error("`;` expected, got '${b.tokenText}'")
+                    return mode.pin
+                }
+                return true
+            }
+        }
+
+        if (braceKind == null || !parseMacroArgumentLazy(b, level + 1)) {
+            b.error("<macro argument> expected, got '${b.tokenText}'")
+            return mode.pin
+        }
+        if (braceKind.needsSemicolon && mode.semicolon && !consumeToken(b, SEMICOLON)) {
+            b.error("`;` expected, got '${b.tokenText}'")
+            return mode.pin
+        }
+        return true
+    }
+
+    // foo ! ();
+    // ^ this name
+    private fun lookupSimpleMacroName(b: PsiBuilder): String? {
+        return if (b.tokenType == IDENTIFIER) {
+            val nextTokenIsExcl = b.probe {
+                b.advanceLexer()
+                b.tokenType == EXCL
+            }
+            if (nextTokenIsExcl) b.tokenText else null
+        } else {
+            null
+        }
     }
 
     @JvmStatic
