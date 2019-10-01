@@ -12,6 +12,7 @@ import com.intellij.openapi.editor.colors.TextAttributesKey
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiDocumentManager
+import org.rust.cargo.project.model.cargoProjects
 import org.rust.cargo.project.workspace.CargoWorkspace
 import org.rust.cargo.project.workspace.PackageOrigin
 import org.rust.cargo.runconfig.filters.RegexpFileLinkFilter.Companion.FILE_POSITION_RE
@@ -27,16 +28,42 @@ import java.util.regex.Pattern
  */
 class RsBacktraceFilter(
     project: Project,
-    cargoProjectDir: VirtualFile,
+    cargoProjectDir: VirtualFile?,
     workspace: CargoWorkspace?
 ) : Filter {
+    private val backtraceItemFilters: List<RsBacktraceItemFilter> = run {
+        if (workspace == null) {
+            val filters = project.cargoProjects.allProjects
+                .mapNotNull { it.workspace }
+                .map { RsBacktraceItemFilter(project, it) }
+            if (filters.isNotEmpty()) return@run filters
+        }
+        listOf(RsBacktraceItemFilter(project, workspace))
+    }
 
-    private val sourceLinkFilter = RegexpFileLinkFilter(project, cargoProjectDir, "\\s+at $FILE_POSITION_RE")
-    private val backtraceItemFilter = RsBacktraceItemFilter(project, workspace)
+    private val sourceLinkFilters: List<RegexpFileLinkFilter> = run {
+        if (cargoProjectDir == null) {
+            return@run project.cargoProjects.allProjects
+                .mapNotNull { it.rootDir }
+                .map { RegexpFileLinkFilter(project, it, LINE_REGEX) }
+        }
+        listOf(RegexpFileLinkFilter(project, cargoProjectDir, LINE_REGEX))
+    }
 
-    override fun applyFilter(line: String, entireLength: Int): Filter.Result? {
-        return backtraceItemFilter.applyFilter(line, entireLength)
-            ?: sourceLinkFilter.applyFilter(line, entireLength)
+
+    /**
+     * Used for 'analyzeStacktraceFilter' extension point.
+     */
+    @Suppress("unused")
+    constructor(project: Project) : this(project, null, null)
+
+    override fun applyFilter(line: String, entireLength: Int): Filter.Result? =
+        (backtraceItemFilters.asSequence() + sourceLinkFilters.asSequence())
+            .mapNotNull { it.applyFilter(line, entireLength) }
+            .firstOrNull()
+
+    companion object {
+        private val LINE_REGEX: String = "\\s+at $FILE_POSITION_RE"
     }
 }
 
@@ -103,7 +130,7 @@ private class RsBacktraceItemFilter(
                 str.removeRange(range)
             } else {
                 str.removeRange(IntRange(range.endInclusive, range.endInclusive))
-                        .removeRange(IntRange(range.start, range.start))
+                    .removeRange(IntRange(range.start, range.start))
             }
         }
         return str
