@@ -17,7 +17,7 @@ fun getPresentation(psi: RsElement): ItemPresentation {
         "(in ${mod.qualifiedName ?: mod.modName ?: psi.containingFile.name})"
     }
 
-    val name = presentableName(psi)
+    val name = makePresentableName(psi)
     return PresentationData(name, location, psi.getIcon(0), null)
 }
 
@@ -28,7 +28,7 @@ fun getPresentationForStructure(psi: RsElement): ItemPresentation {
             append(xs.joinToString(", "))
             append(')')
         }
-        append(presentableName(psi))
+        append(makePresentableName(psi))
         when (psi) {
             is RsFunction -> {
                 appendCommaList(psi.valueParameters.mapNotNull { it.typeReference?.text })
@@ -57,7 +57,7 @@ fun getPresentationForStructure(psi: RsElement): ItemPresentation {
     return PresentationData(presentation, null, icon, null)
 }
 
-private fun presentableName(psi: RsElement): String? {
+fun makePresentableName(psi: RsElement): String? {
     return when (psi) {
         is RsNamedElement -> psi.name
         is RsImplItem -> {
