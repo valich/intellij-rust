@@ -5,7 +5,9 @@
 
 package org.rustSlowTests
 
-import com.intellij.testFramework.ProjectViewTestUtil
+import com.intellij.ide.util.treeView.AbstractTreeStructure
+import com.intellij.testFramework.PlatformTestUtil
+import com.intellij.testFramework.ProjectViewTestUtil.checkGetParentConsistency
 import org.rust.FileTreeBuilder
 import org.rust.cargo.RsWithToolchainTestBase
 import org.rust.cargo.project.model.cargoProjects
@@ -19,11 +21,11 @@ class CargoProjectStructureTest : RsWithToolchainTestBase() {
         Root
          Project(unitTest)
           Targets
-           Target(foo[lib])
-           Target(foo[bin])
-           Target(example[example])
-           Target(test[test])
            Target(bench[bench])
+           Target(example[example])
+           Target(foo[bin])
+           Target(foo[lib])
+           Target(test[test])
     """) {
         toml("Cargo.toml", """
             [package]
@@ -91,6 +93,14 @@ class CargoProjectStructureTest : RsWithToolchainTestBase() {
             testRootDisposable,
             project.cargoProjects.allProjects.toList()
         )
-        ProjectViewTestUtil.assertStructureEqual(structure, expectedTreeStructure.trimIndent() + "\n", null)
+        assertStructureEqual(structure, expectedTreeStructure.trimIndent() + "\n")
+    }
+
+    private fun assertStructureEqual(structure: AbstractTreeStructure, expected: String) {
+        checkGetParentConsistency(structure, structure.rootElement)
+        val actual = PlatformTestUtil.print(structure, structure.rootElement) {
+            if (it is CargoProjectTreeStructure.CargoSimpleNode) it.toTestString() else it.toString()
+        }
+        assertEquals(expected, actual)
     }
 }
