@@ -2910,4 +2910,46 @@ class RsErrorAnnotatorTest : RsAnnotatorTestBase(RsErrorAnnotator::class.java) {
             let Foo { r#field: _ } = f;
         }
     """)
+
+    @MockRustcVersion("1.40.0-nightly")
+    fun `test unstable feature E0658 1`() = checkErrors("""
+        #[unstable(feature = "aaa")]
+        struct S {
+            #[unstable(feature = "bbb")] field: i32
+        }
+        
+        impl <error descr="`aaa` is experimental [E0658]">S</error> {
+            #[unstable(feature = "ccc")]
+            fn foo(self) {}
+        }
+        
+        fn main() {
+            let x = <error descr="`aaa` is experimental [E0658]">S</error> { field: 0 };
+            <error descr="`bbb` is experimental [E0658]">x.field</error>;
+            <error descr="`ccc` is experimental [E0658]">x.foo()</error>;
+        }
+    """)
+
+    @MockRustcVersion("1.40.0-nightly")
+    fun `test unstable feature E0658 2`() = checkErrors("""
+        #![feature(aaa)]
+        #![feature(bbb)]
+        #![feature(ccc)]
+        
+        #[unstable(feature = "aaa")]
+        struct S {
+            #[unstable(feature = "bbb")] field: i32
+        }
+        
+        impl S {
+            #[unstable(feature = "ccc")]
+            fn foo(self) {}
+        }
+        
+        fn main() {
+            let x = S { field: 0 };
+            x.field;
+            x.foo();
+        }
+    """)
 }

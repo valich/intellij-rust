@@ -21,14 +21,14 @@ import org.rust.lang.core.stubs.index.RsFeatureIndex
 import org.rust.lang.utils.RsDiagnostic
 import org.rust.lang.utils.addToHolder
 
-data class CompilerFeature(val name: String, val state: FeatureState, val since: SemVer) {
+data class CompilerFeature(val name: String, val state: FeatureState, val since: SemVer? = null) {
     constructor(name: String, state: FeatureState, since: String) : this(name, state, SemVer.parseFromText(since)!!)
 
     fun availability(element: PsiElement): FeatureAvailability {
         val rsElement = element.ancestorOrSelf<RsElement>() ?: return UNKNOWN
         val version = rsElement.cargoProject?.rustcInfo?.version ?: return UNKNOWN
 
-        if (state == ACCEPTED && version.semver >= since) return AVAILABLE
+        if (state == ACCEPTED && (since == null || version.semver >= since)) return AVAILABLE
         if (version.channel != RustChannel.NIGHTLY) return NOT_AVAILABLE
 
         val crateRoot = rsElement.crateRoot ?: return UNKNOWN
