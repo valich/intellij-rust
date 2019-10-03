@@ -33,6 +33,12 @@ interface RsExpandedElement : RsElement {
             }
             return parent
         }
+
+        fun getContextImplWithoutIndexAccess(psi: RsExpandedElement): PsiElement? {
+            psi.expandedFrom?.let { return it.context }
+            psi.getUserData(RS_EXPANSION_CONTEXT)?.let { return it }
+            return psi.stubParent
+        }
     }
 }
 
