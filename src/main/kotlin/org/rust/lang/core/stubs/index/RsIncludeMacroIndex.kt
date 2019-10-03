@@ -14,9 +14,13 @@ import com.intellij.psi.util.CachedValueProvider
 import com.intellij.psi.util.CachedValuesManager
 import com.intellij.util.PathUtil
 import org.rust.lang.core.psi.*
-import org.rust.lang.core.psi.ext.*
+import org.rust.lang.core.psi.ext.RsMod
+import org.rust.lang.core.psi.ext.findIncludingFile
+import org.rust.lang.core.psi.ext.macroName
+import org.rust.lang.core.psi.ext.stringValue
 import org.rust.lang.core.stubs.RsFileStub
 import org.rust.lang.core.stubs.RsMacroCallStub
+import org.rust.openapiext.checkCommitIsNotInProgress
 
 class RsIncludeMacroIndex : StringStubIndexExtension<RsMacroCall>() {
     override fun getVersion(): Int = RsFileStub.Type.stubVersion
@@ -47,6 +51,7 @@ class RsIncludeMacroIndex : StringStubIndexExtension<RsMacroCall>() {
         private fun getIncludingModInternal(file: RsFile): RsMod? {
             val key = file.name
             val project = file.project
+            checkCommitIsNotInProgress(project)
 
             var parentMod: RsMod? = null
             StubIndex.getInstance().processElements(KEY, key, project, GlobalSearchScope.allScope(project), RsMacroCall::class.java) { macroCall ->

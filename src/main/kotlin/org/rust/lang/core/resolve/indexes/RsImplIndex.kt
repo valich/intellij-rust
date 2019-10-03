@@ -20,6 +20,7 @@ import org.rust.lang.core.stubs.RsFileStub
 import org.rust.lang.core.stubs.RsImplItemStub
 import org.rust.lang.core.types.TyFingerprint
 import org.rust.lang.core.types.ty.Ty
+import org.rust.openapiext.checkCommitIsNotInProgress
 import org.rust.openapiext.getElements
 
 class RsImplIndex : AbstractStubIndex<TyFingerprint, RsImplItem>() {
@@ -33,6 +34,7 @@ class RsImplIndex : AbstractStubIndex<TyFingerprint, RsImplItem>() {
          * @see TyFingerprint
          */
         fun findPotentialImpls(project: Project, target: Ty): Sequence<RsCachedImplItem> {
+            checkCommitIsNotInProgress(project)
             project.macroExpansionManager.ensureUpToDate()
             val impls = run {
                 val fingerprint = TyFingerprint.create(target)
@@ -48,6 +50,7 @@ class RsImplIndex : AbstractStubIndex<TyFingerprint, RsImplItem>() {
 
         /** return impls for generic type `impl<T> Trait for T {}` */
         fun findFreeImpls(project: Project): Sequence<RsCachedImplItem> {
+            checkCommitIsNotInProgress(project)
             val freeImpls = getElements(KEY, TyFingerprint.TYPE_PARAMETER_FINGERPRINT, project, GlobalSearchScope.allScope(project))
             // filter dangling (not attached to some crate) rust files, e.g. tests, generated source
             return freeImpls.asSequence()
